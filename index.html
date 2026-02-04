@@ -1,0 +1,1113 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>音源＆オシロスコープアプリ</title>
+    <style>
+        :root {
+            --primary: #007AFF;
+            --bg: #f2f2f7;
+            --card-bg: #ffffff;
+            --text: #1c1c1e;
+            --border: #c6c6c8;
+            --danger: #ff3b30;
+            --success: #34c759;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg);
+            color: var(--text);
+            -webkit-user-select: none;
+            user-select: none;
+            touch-action: manipulation;
+        }
+
+        header {
+            background-color: var(--card-bg);
+            padding: 10px;
+            text-align: center;
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .mode-switch {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .mode-btn {
+            padding: 10px 20px;
+            border: 1px solid var(--primary);
+            background: transparent;
+            color: var(--primary);
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            flex: 1;
+            max-width: 200px;
+        }
+
+        .mode-btn.active {
+            background: var(--primary);
+            color: white;
+        }
+
+        main {
+            padding: 15px;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding-bottom: 50px;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+        }
+
+        h2,
+        h3 {
+            margin-top: 0;
+        }
+
+        .control-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 25px;
+        }
+
+        select,
+        input[type="number"] {
+            font-size: 16px;
+            padding: 8px;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            background: #fff;
+        }
+
+        .row {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 10px 15px;
+            border-radius: 8px;
+            border: none;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .btn-primary {
+            background-color: var(--primary);
+        }
+
+        .btn-danger {
+            background-color: var(--danger);
+        }
+
+        .btn-success {
+            background-color: var(--success);
+        }
+
+        .btn-outline {
+            background-color: transparent;
+            border: 1px solid var(--border);
+            color: var(--text);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* --- Toggle Switch Styles --- */
+        .toggle-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 34px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #e9e9eb;
+            transition: .3s;
+            border-radius: 34px;
+            border: 1px solid #d1d1d6;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .3s;
+            border-radius: 50%;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        input:checked+.slider {
+            background-color: var(--success);
+            border-color: var(--success);
+        }
+
+        input:checked+.slider:before {
+            transform: translateX(26px);
+        }
+
+        .toggle-label {
+            font-weight: bold;
+            font-size: 14px;
+            color: #8e8e93;
+        }
+
+        .toggle-label.on {
+            color: var(--success);
+        }
+
+        /* --- Layout --- */
+        .channel-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        @media (max-width: 768px) {
+            .channel-container {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .channel-box {
+            border: 1px solid var(--border);
+            padding: 10px;
+            border-radius: 8px;
+        }
+
+        .ch-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .canvas-container {
+            position: relative;
+            width: 100%;
+        }
+
+        canvas {
+            width: 100%;
+            height: 300px;
+            background-color: #fff;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            touch-action: none;
+            cursor: crosshair;
+        }
+
+        #osc-canvas {
+            background-color: #000;
+        }
+
+        #spec-tooltip {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            pointer-events: none;
+            display: none;
+            top: 10px;
+            left: 50px;
+            z-index: 10;
+        }
+
+        #start-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        #start-btn {
+            padding: 20px 40px;
+            font-size: 24px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+        }
+
+        .value-display {
+            float: right;
+            font-weight: normal;
+            color: var(--primary);
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="start-overlay">
+        <button id="start-btn">実験を開始する<br><span style="font-size:14px">タップして音声を有効化 (44.1kHz)</span></button>
+    </div>
+
+    <header>
+        <div class="mode-switch">
+            <button class="mode-btn active" onclick="switchMode('source')">音源 (Source)</button>
+            <button class="mode-btn" onclick="switchMode('observer')">観測者 (Observer)</button>
+        </div>
+    </header>
+
+    <main>
+        <div id="source-mode">
+            <div class="card">
+                <h3>音源設定</h3>
+                <p style="font-size: 0.9em; color: #666;">※ ステレオ効果（左右独立）を確認するには、外部スピーカーを接続することを推奨します。</p>
+
+                <div class="channel-container">
+                    <div class="channel-box">
+                        <div class="ch-header">
+                            <h3 style="margin:0">Left (左)</h3>
+                            <div class="toggle-container">
+                                <span class="toggle-label" id="l-status-text">OFF</span>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="l-power" onchange="updateSource('l')">
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="control-group">
+                            <label>波形 (Waveform)</label>
+                            <select id="l-wave" onchange="updateSource('l')" style="width:100%">
+                                <option value="sine">正弦波 (Sine)</option>
+                                <option value="square">矩形波 (Square)</option>
+                                <option value="sawtooth">ノコギリ波 (Sawtooth)</option>
+                                <option value="triangle">三角波 (Triangle)</option>
+                            </select>
+                        </div>
+
+                        <div class="control-group">
+                            <label>振動数 (Frequency): <span id="l-freq-val" class="value-display">440 Hz</span></label>
+                            <input type="range" id="l-freq" min="100" max="2000" value="440" step="1"
+                                oninput="updateSource('l')">
+                        </div>
+
+                        <div class="control-group">
+                            <label>音量 (Volume): <span id="l-vol-val" class="value-display">0.5</span></label>
+                            <input type="range" id="l-vol" min="0" max="1" value="0.5" step="0.01"
+                                oninput="updateSource('l')">
+                        </div>
+
+                        <div class="control-group">
+                            <label>位相 (Phase)</label>
+                            <div class="row">
+                                <button class="btn btn-outline" id="l-phase-norm" onclick="setPhase('l', 1)"
+                                    style="background:#ddd">正相 (+)</button>
+                                <button class="btn btn-outline" id="l-phase-inv" onclick="setPhase('l', -1)">逆相
+                                    (-)</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="channel-box">
+                        <div class="ch-header">
+                            <h3 style="margin:0">Right (右)</h3>
+                            <div class="toggle-container">
+                                <span class="toggle-label" id="r-status-text">OFF</span>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="r-power" onchange="updateSource('r')">
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="control-group">
+                            <label>波形 (Waveform)</label>
+                            <select id="r-wave" onchange="updateSource('r')" style="width:100%">
+                                <option value="sine">正弦波 (Sine)</option>
+                                <option value="square">矩形波 (Square)</option>
+                                <option value="sawtooth">ノコギリ波 (Sawtooth)</option>
+                                <option value="triangle">三角波 (Triangle)</option>
+                            </select>
+                        </div>
+
+                        <div class="control-group">
+                            <label>振動数 (Frequency): <span id="r-freq-val" class="value-display">440 Hz</span></label>
+                            <input type="range" id="r-freq" min="100" max="2000" value="440" step="1"
+                                oninput="updateSource('r')">
+                        </div>
+
+                        <div class="control-group">
+                            <label>音量 (Volume): <span id="r-vol-val" class="value-display">0.5</span></label>
+                            <input type="range" id="r-vol" min="0" max="1" value="0.5" step="0.01"
+                                oninput="updateSource('r')">
+                        </div>
+
+                        <div class="control-group">
+                            <label>位相 (Phase)</label>
+                            <div class="row">
+                                <button class="btn btn-outline" id="r-phase-norm" onclick="setPhase('r', 1)"
+                                    style="background:#ddd">正相 (+)</button>
+                                <button class="btn btn-outline" id="r-phase-inv" onclick="setPhase('r', -1)">逆相
+                                    (-)</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="observer-mode" class="hidden">
+            <div class="card">
+                <div class="ch-header">
+                    <h3>オシロスコープ (波形)</h3>
+                    <div>
+                        <button class="btn btn-primary" id="osc-pause-btn" onclick="toggleOscPause()">キャプチャ
+                            (停止)</button>
+                        <button class="btn btn-outline"
+                            onclick="downloadCanvas('osc-canvas', 'waveform.png')">保存</button>
+                    </div>
+                </div>
+                <div class="canvas-container">
+                    <canvas id="osc-canvas"></canvas>
+                </div>
+                <div class="control-group" style="margin-top: 15px;">
+                    <div class="row">
+                        <div style="flex:1">
+                            <label>描画モード</label>
+                            <select id="osc-draw-mode">
+                                <option value="linear">リニア波形 (矩形/ノコギリ波など)</option>
+                                <option value="smooth" selected>滑らか波形 (正弦波など)</option>
+                            </select>
+                        </div>
+                        <div style="flex:1">
+                            <label>時間スケール</label>
+                            <input type="range" id="osc-time-scale" min="1" max="10" value="1" step="0.1">
+                        </div>
+                        <div style="flex:1">
+                            <label>振幅スケール</label>
+                            <input type="range" id="osc-amp-scale" min="0.1" max="10" value="1" step="0.1">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="ch-header">
+                    <h3>簡易スペクトル解析 (FFT)</h3>
+                    <button class="btn btn-outline" onclick="downloadCanvas('spec-canvas', 'spectrum.png')">保存</button>
+                </div>
+                <div class="control-group">
+                    <div class="row">
+                        <div>
+                            <label>FFTサイズ (N)</label>
+                            <select id="spec-fft-size">
+                                <option value="2048">2048</option>
+                                <option value="4096">4096</option>
+                                <option value="8192" selected>8192</option>
+                                <option value="16384">16384</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label>録音時間(秒)</label>
+                            <input type="number" id="spec-duration" value="1.0" min="0.1" max="5.0" step="0.1"
+                                style="width: 80px;">
+                        </div>
+                        <button class="btn btn-success" id="spec-start-btn"
+                            onclick="startSpectrumAnalysis()">解析開始</button>
+                    </div>
+                    <div
+                        style="margin-top:8px; display:flex; justify-content:space-between; font-size:12px; color:var(--primary);">
+                        <span id="spec-status">待機中</span>
+                        <span id="current-sr">Rate: 44100Hz (Hann Window)</span>
+                    </div>
+                </div>
+
+                <div class="canvas-container" id="spec-container">
+                    <div id="spec-tooltip"></div>
+                    <canvas id="spec-canvas"></canvas>
+                </div>
+
+                <div class="control-group" style="margin-top: 15px;">
+                    <div class="row">
+                        <div style="flex:1">
+                            <label>周波数範囲 (Max Hz)</label>
+                            <input type="range" id="spec-freq-range" min="1000" max="22050" value="3000" step="500"
+                                oninput="updateSpecGridLabel(this.value)">
+                            <span id="spec-freq-val" style="font-size:12px">3000 Hz</span>
+                        </div>
+                        <div style="flex:1">
+                            <label>強度範囲 (dB Scale)</label>
+                            <input type="range" id="spec-db-range" min="50" max="150" value="100" step="10">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // --- 簡易的なJS FFTの実装 (Hann窓対応のため) ---
+        class SimpleFFT {
+            constructor(size) {
+                this.size = size;
+                this.reverseTable = new Uint32Array(size);
+                this.sinTable = new Float32Array(size);
+                this.cosTable = new Float32Array(size);
+                this.hannWindow = new Float32Array(size);
+
+                let limit = 1;
+                let bit = size >> 1;
+                let i;
+
+                while (limit < size) {
+                    for (i = 0; i < limit; i++) {
+                        this.reverseTable[i + limit] = this.reverseTable[i] + bit;
+                    }
+                    limit <<= 1;
+                    bit >>= 1;
+                }
+
+                for (i = 0; i < size; i++) {
+                    this.sinTable[i] = Math.sin(-Math.PI / i);
+                    this.cosTable[i] = Math.cos(-Math.PI / i);
+                    this.hannWindow[i] = 0.5 * (1 - Math.cos((2 * Math.PI * i) / (size - 1)));
+                }
+            }
+
+            calculate(real, imag) {
+                const size = this.size;
+                const reverseTable = this.reverseTable;
+                let i;
+
+                for (i = 0; i < size; i++) {
+                    const off = reverseTable[i];
+                    if (off < i) {
+                        const tr = real[i]; const ti = imag[i];
+                        real[i] = real[off]; imag[i] = imag[off];
+                        real[off] = tr; imag[off] = ti;
+                    }
+                }
+
+                let halfSize = 1;
+                while (halfSize < size) {
+                    const phaseShiftStepReal = Math.cos(-Math.PI / halfSize);
+                    const phaseShiftStepImag = Math.sin(-Math.PI / halfSize);
+                    let currentPhaseShiftReal = 1;
+                    let currentPhaseShiftImag = 0;
+
+                    for (let fftStep = 0; fftStep < halfSize; fftStep++) {
+                        i = fftStep;
+                        while (i < size) {
+                            const off = i + halfSize;
+                            const tr = (currentPhaseShiftReal * real[off]) - (currentPhaseShiftImag * imag[off]);
+                            const ti = (currentPhaseShiftReal * imag[off]) + (currentPhaseShiftImag * real[off]);
+
+                            real[off] = real[i] - tr;
+                            imag[off] = imag[i] - ti;
+                            real[i] += tr;
+                            imag[i] += ti;
+                            i += halfSize << 1;
+                        }
+                        const tmpReal = currentPhaseShiftReal;
+                        currentPhaseShiftReal = (tmpReal * phaseShiftStepReal) - (currentPhaseShiftImag * phaseShiftStepImag);
+                        currentPhaseShiftImag = (tmpReal * phaseShiftStepImag) + (currentPhaseShiftImag * phaseShiftStepReal);
+                    }
+                    halfSize <<= 1;
+                }
+            }
+        }
+
+        // --- アプリケーション本体 ---
+        let audioCtx;
+        let isAudioInit = false;
+        const sources = {
+            l: { osc: null, gain: null, panner: null, phase: 1 },
+            r: { osc: null, gain: null, panner: null, phase: 1 }
+        };
+        let micStream = null, analyser = null, micSource = null;
+
+        let oscAnimationId;
+        let isOscPaused = false;
+        const oscCanvas = document.getElementById('osc-canvas');
+        const oscCtx = oscCanvas.getContext('2d');
+
+        const specCanvas = document.getElementById('spec-canvas');
+        const specCtx = specCanvas.getContext('2d');
+
+        let recordedBuffers = [];
+        let isSpecRecording = false;
+        let lastSpecResults = null;
+
+        const MARGIN = { top: 20, right: 30, bottom: 40, left: 60 };
+
+        document.getElementById('start-btn').addEventListener('click', async () => {
+            try {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                audioCtx = new AudioContext({ sampleRate: 44100 });
+
+                document.getElementById('current-sr').innerText = `Rate: ${audioCtx.sampleRate}Hz (Hann Window)`;
+
+                setupCanvas(oscCanvas);
+                setupCanvas(specCanvas);
+
+                drawSpectrumGrid(specCtx, 3000, 100);
+
+                // --- 修正点：マイク入力の自動調整を無効化 ---
+                const constraints = {
+                    audio: {
+                        echoCancellation: false,
+                        noiseSuppression: false,
+                        autoGainControl: false,
+                        mozAutoGainControl: false,
+                        googAutoGainControl: false
+                    },
+                    video: false
+                };
+
+                micStream = await navigator.mediaDevices.getUserMedia(constraints);
+                micSource = audioCtx.createMediaStreamSource(micStream);
+                analyser = audioCtx.createAnalyser();
+                analyser.fftSize = 2048;
+                micSource.connect(analyser);
+
+                drawOscilloscope();
+
+                document.getElementById('start-overlay').style.display = 'none';
+                isAudioInit = true;
+
+                setupSpecInteraction();
+
+            } catch (err) {
+                console.error(err);
+                alert("マイクの使用が拒否されたか、エラーが発生しました。\n" + err);
+            }
+        });
+
+        function setupCanvas(canvas) {
+            const dpr = window.devicePixelRatio || 1;
+            const rect = canvas.getBoundingClientRect();
+            canvas.width = rect.width * dpr;
+            canvas.height = rect.height * dpr;
+            const ctx = canvas.getContext('2d');
+            ctx.resetTransform();
+            ctx.scale(dpr, dpr);
+        }
+
+        function switchMode(mode) {
+            const btns = document.querySelectorAll('.mode-btn');
+            btns.forEach(b => b.classList.remove('active'));
+            if (mode === 'source') {
+                btns[0].classList.add('active');
+                document.getElementById('source-mode').classList.remove('hidden');
+                document.getElementById('observer-mode').classList.add('hidden');
+                if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+            } else {
+                btns[1].classList.add('active');
+                document.getElementById('source-mode').classList.add('hidden');
+                document.getElementById('observer-mode').classList.remove('hidden');
+                setupCanvas(oscCanvas);
+                setupCanvas(specCanvas);
+                if (isOscPaused) drawOscilloscope(true);
+                else if (lastSpecResults) drawSpectrumGraph(lastSpecResults);
+                else drawSpectrumGrid(specCtx, parseFloat(document.getElementById('spec-freq-range').value), 100);
+            }
+        }
+
+        function updateSource(ch) {
+            if (!isAudioInit) return;
+            const isOn = document.getElementById(ch + '-power').checked;
+
+            // UI Status Update
+            const statusText = document.getElementById(ch + '-status-text');
+            if (isOn) {
+                statusText.innerText = "ON";
+                statusText.classList.add('on');
+            } else {
+                statusText.innerText = "OFF";
+                statusText.classList.remove('on');
+            }
+
+            const freq = parseFloat(document.getElementById(ch + '-freq').value);
+            const vol = parseFloat(document.getElementById(ch + '-vol').value);
+            const wave = document.getElementById(ch + '-wave').value;
+            const phase = sources[ch].phase;
+
+            document.getElementById(ch + '-freq-val').innerText = freq + ' Hz';
+            document.getElementById(ch + '-vol-val').innerText = vol;
+
+            if (sources[ch].osc) {
+                sources[ch].osc.stop();
+                sources[ch].osc.disconnect();
+                sources[ch].osc = null;
+            }
+
+            if (isOn) {
+                const osc = audioCtx.createOscillator();
+                const gainNode = audioCtx.createGain();
+                const panner = audioCtx.createStereoPanner();
+
+                osc.type = wave;
+                osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+                gainNode.gain.setValueAtTime(vol * phase, audioCtx.currentTime);
+                panner.pan.setValueAtTime(ch === 'l' ? -1 : 1, audioCtx.currentTime);
+
+                osc.connect(gainNode);
+                gainNode.connect(panner);
+                panner.connect(audioCtx.destination);
+                osc.start();
+
+                sources[ch].osc = osc;
+                sources[ch].gain = gainNode;
+                sources[ch].panner = panner;
+            }
+        }
+
+        function setPhase(ch, val) {
+            sources[ch].phase = val;
+            const normBtn = document.getElementById(ch + '-phase-norm');
+            const invBtn = document.getElementById(ch + '-phase-inv');
+            if (val === 1) {
+                normBtn.style.background = '#ddd';
+                invBtn.style.background = 'transparent';
+            } else {
+                normBtn.style.background = 'transparent';
+                invBtn.style.background = '#ffcccc';
+            }
+            updateSource(ch);
+        }
+
+        // --- Oscilloscope Drawing ---
+        function drawOscilloscope(forceRedraw = false) {
+            if (document.getElementById('observer-mode').classList.contains('hidden') && !forceRedraw) {
+                oscAnimationId = requestAnimationFrame(() => drawOscilloscope());
+                return;
+            }
+            if (isOscPaused && !forceRedraw) return;
+
+            if (analyser.fftSize !== 2048) analyser.fftSize = 2048;
+
+            const bufferLength = analyser.fftSize;
+            const dataArray = new Uint8Array(bufferLength);
+            analyser.getByteTimeDomainData(dataArray);
+
+            const width = oscCanvas.width / (window.devicePixelRatio || 1);
+            const height = oscCanvas.height / (window.devicePixelRatio || 1);
+
+            oscCtx.fillStyle = 'rgb(20, 20, 20)';
+            oscCtx.fillRect(0, 0, width, height);
+
+            oscCtx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+            oscCtx.lineWidth = 1;
+            oscCtx.beginPath();
+            oscCtx.moveTo(0, height / 2); oscCtx.lineTo(width, height / 2);
+            oscCtx.stroke();
+
+            // Settings
+            const drawMode = document.getElementById('osc-draw-mode').value;
+            const timeScale = parseFloat(document.getElementById('osc-time-scale').value);
+            const ampScale = parseFloat(document.getElementById('osc-amp-scale').value);
+
+            oscCtx.lineWidth = 3;
+            oscCtx.strokeStyle = 'rgb(0, 255, 0)';
+            oscCtx.lineJoin = 'round';
+            oscCtx.lineCap = 'round';
+            oscCtx.beginPath();
+
+            const sliceWidth = width * 1.0 / bufferLength * timeScale;
+
+            // Trigger logic (stabilize waveform)
+            let triggerOffset = 0;
+            // Simple rising edge trigger
+            for (let i = 0; i < bufferLength / 2; i++) {
+                if (dataArray[i] < 128 && dataArray[i + 1] >= 128) {
+                    triggerOffset = i;
+                    break;
+                }
+            }
+
+            let x = 0;
+            let startY = 0;
+
+            let firstIndex = triggerOffset;
+            let v = dataArray[firstIndex] / 128.0;
+            let y = (v - 1) * height / 2 * ampScale + height / 2;
+            oscCtx.moveTo(x, y);
+
+            let prevX = x;
+            let prevY = y;
+
+            for (let i = 1; i < bufferLength; i++) {
+                let index = i + triggerOffset;
+                if (index >= bufferLength) break;
+
+                v = dataArray[index] / 128.0;
+                y = (v - 1) * height / 2 * ampScale + height / 2;
+                x += sliceWidth;
+
+                if (drawMode === 'smooth') {
+                    // Smooth Curve (Quadratic)
+                    let midX = (prevX + x) / 2;
+                    let midY = (prevY + y) / 2;
+                    oscCtx.quadraticCurveTo(prevX, prevY, midX, midY);
+                } else {
+                    // Linear (Direct line for Square/Sawtooth accuracy)
+                    oscCtx.lineTo(x, y);
+                }
+
+                prevX = x;
+                prevY = y;
+
+                if (x > width) break;
+            }
+
+            if (drawMode === 'smooth') {
+                oscCtx.lineTo(prevX, prevY);
+            }
+
+            oscCtx.stroke();
+
+            if (!isOscPaused) {
+                oscAnimationId = requestAnimationFrame(() => drawOscilloscope());
+            }
+        }
+
+        function toggleOscPause() {
+            isOscPaused = !isOscPaused;
+            const btn = document.getElementById('osc-pause-btn');
+            if (isOscPaused) {
+                btn.innerText = "再開 (Live)";
+                btn.classList.replace('btn-primary', 'btn-success');
+                cancelAnimationFrame(oscAnimationId);
+            } else {
+                btn.innerText = "キャプチャ (停止)";
+                btn.classList.replace('btn-success', 'btn-primary');
+                drawOscilloscope();
+            }
+        }
+
+        function startSpectrumAnalysis() {
+            if (isSpecRecording) return;
+            const duration = parseFloat(document.getElementById('spec-duration').value) * 1000;
+            const fftSize = parseInt(document.getElementById('spec-fft-size').value);
+
+            const btn = document.getElementById('spec-start-btn');
+            const status = document.getElementById('spec-status');
+            isSpecRecording = true;
+            btn.disabled = true;
+            btn.innerText = "録音中...";
+            status.innerText = "データ収集中...";
+
+            analyser.fftSize = fftSize;
+
+            recordedBuffers = [];
+            const startTime = Date.now();
+
+            function recordLoop() {
+                if (Date.now() - startTime >= duration) {
+                    processSpectrum(fftSize);
+                    return;
+                }
+                const dataArray = new Float32Array(fftSize);
+                analyser.getFloatTimeDomainData(dataArray);
+                recordedBuffers.push(dataArray);
+                setTimeout(recordLoop, (fftSize / audioCtx.sampleRate) * 1000 * 0.5);
+            }
+            recordLoop();
+        }
+
+        function processSpectrum(fftSize) {
+            document.getElementById('spec-status').innerText = "解析中(FFT)...";
+
+            setTimeout(() => {
+                const fft = new SimpleFFT(fftSize);
+                const bufferCount = recordedBuffers.length;
+                if (bufferCount === 0) return;
+
+                const avgMagnitude = new Float32Array(fftSize / 2);
+
+                for (let b = 0; b < bufferCount; b++) {
+                    const real = recordedBuffers[b];
+                    const imag = new Float32Array(fftSize);
+
+                    for (let i = 0; i < fftSize; i++) {
+                        real[i] = real[i] * fft.hannWindow[i];
+                    }
+
+                    fft.calculate(real, imag);
+
+                    for (let i = 0; i < fftSize / 2; i++) {
+                        const mag = Math.sqrt(real[i] * real[i] + imag[i] * imag[i]);
+                        avgMagnitude[i] += mag;
+                    }
+                }
+
+                for (let i = 0; i < fftSize / 2; i++) {
+                    avgMagnitude[i] = avgMagnitude[i] / bufferCount;
+                }
+
+                lastSpecResults = avgMagnitude;
+
+                isSpecRecording = false;
+                const btn = document.getElementById('spec-start-btn');
+                btn.disabled = false;
+                btn.innerText = "解析開始";
+                document.getElementById('spec-status').innerText = "解析完了";
+
+                drawSpectrumGraph(avgMagnitude);
+            }, 50);
+        }
+
+        let lastSpecData = null;
+
+        function updateSpecGridLabel(val) {
+            document.getElementById('spec-freq-val').innerText = val + ' Hz';
+            if (lastSpecResults) drawSpectrumGraph(lastSpecResults);
+            else drawSpectrumGrid(specCtx, parseFloat(val), 100);
+        }
+
+        function drawSpectrumGraph(data) {
+            const canvas = specCanvas;
+            const ctx = specCtx;
+            const width = canvas.width / (window.devicePixelRatio || 1);
+            const height = canvas.height / (window.devicePixelRatio || 1);
+
+            const drawW = width - MARGIN.left - MARGIN.right;
+            const drawH = height - MARGIN.top - MARGIN.bottom;
+
+            const maxFreq = parseFloat(document.getElementById('spec-freq-range').value);
+            const dbScale = parseFloat(document.getElementById('spec-db-range').value);
+
+            ctx.clearRect(0, 0, width, height);
+            drawSpectrumGrid(ctx, maxFreq, dbScale);
+
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = 'rgb(255, 0, 0)';
+            ctx.beginPath();
+
+            const bufferLength = data.length;
+            const sampleRate = audioCtx.sampleRate;
+            const freqPerBin = (sampleRate / 2) / bufferLength;
+            let first = true;
+
+            for (let i = 0; i < bufferLength; i++) {
+                const freq = i * freqPerBin;
+                if (freq > maxFreq) break;
+
+                const x = MARGIN.left + (freq / maxFreq) * drawW;
+
+                let val = data[i];
+                let dbVal = 20 * Math.log10(val + 1e-6);
+                const normalizedHeight = (dbVal + 20) / (dbScale / 1.5);
+                let y = MARGIN.top + drawH - (normalizedHeight * drawH);
+
+                if (y < MARGIN.top) y = MARGIN.top;
+                if (y > MARGIN.top + drawH) y = MARGIN.top + drawH;
+
+                if (first) { ctx.moveTo(x, y); first = false; }
+                else { ctx.lineTo(x, y); }
+            }
+            ctx.stroke();
+        }
+
+        document.getElementById('spec-db-range').addEventListener('input', () => {
+            if (lastSpecResults) drawSpectrumGraph(lastSpecResults);
+        });
+
+        function drawSpectrumGrid(ctx, maxFreq, sensitivity) {
+            const width = specCanvas.width / (window.devicePixelRatio || 1);
+            const height = specCanvas.height / (window.devicePixelRatio || 1);
+
+            const drawW = width - MARGIN.left - MARGIN.right;
+            const drawH = height - MARGIN.top - MARGIN.bottom;
+            const originX = MARGIN.left;
+            const originY = MARGIN.top + drawH;
+
+            ctx.fillStyle = '#f9f9f9';
+            ctx.fillRect(0, 0, width, height);
+
+            ctx.strokeStyle = '#ccc';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(originX, MARGIN.top, drawW, drawH);
+
+            ctx.beginPath();
+            ctx.strokeStyle = '#ddd';
+            ctx.lineWidth = 1;
+
+            const step = maxFreq > 10000 ? 2000 : 1000;
+            ctx.fillStyle = '#333';
+            ctx.textAlign = "center";
+            ctx.font = "12px Arial";
+
+            for (let f = 0; f <= maxFreq; f += step) {
+                const x = originX + (f / maxFreq) * drawW;
+
+                ctx.moveTo(x, MARGIN.top);
+                ctx.lineTo(x, originY);
+
+                ctx.fillText(f, x, originY + 15);
+            }
+            ctx.textAlign = "right";
+            ctx.fillText("Hz", width - 5, originY + 15);
+
+            ctx.textAlign = "right";
+            ctx.textBaseline = "middle";
+            for (let i = 0; i <= 5; i++) {
+                const y = originY - (drawH * (i / 5));
+                ctx.moveTo(originX, y);
+                ctx.lineTo(originX + drawW, y);
+                ctx.fillText(i * 20, originX - 5, y);
+            }
+            ctx.textAlign = "center";
+            ctx.fillText("dB (Arb.)", originX - 30, MARGIN.top - 10);
+
+            ctx.stroke();
+            ctx.textBaseline = "alphabetic";
+        }
+
+        function setupSpecInteraction() {
+            const container = document.getElementById('spec-container');
+            const tooltip = document.getElementById('spec-tooltip');
+
+            const handleMove = (clientX, clientY) => {
+                if (!lastSpecResults) return;
+
+                const rect = specCanvas.getBoundingClientRect();
+                const x = clientX - rect.left;
+                const y = clientY - rect.top;
+
+                const cssW = rect.width;
+                const cssH = rect.height;
+
+                const leftRatio = MARGIN.left / specCanvas.width;
+                const rightRatio = MARGIN.right / specCanvas.width;
+                const drawW_Ratio = 1 - leftRatio - rightRatio;
+
+                const cssMarginLeft = cssW * leftRatio;
+                const cssGraphW = cssW * drawW_Ratio;
+
+                let ratioX = (x - cssMarginLeft) / cssGraphW;
+                if (ratioX < 0) ratioX = 0;
+                if (ratioX > 1) ratioX = 1;
+
+                const maxFreq = parseFloat(document.getElementById('spec-freq-range').value);
+                const targetFreq = ratioX * maxFreq;
+
+                const sampleRate = audioCtx.sampleRate;
+                const bufferLength = lastSpecResults.length;
+                const freqPerBin = (sampleRate / 2) / bufferLength;
+
+                let targetIndex = Math.round(targetFreq / freqPerBin);
+                if (targetIndex >= bufferLength) targetIndex = bufferLength - 1;
+
+                let searchRange = 20;
+                let maxVal = -1;
+                let maxIndex = targetIndex;
+
+                let start = Math.max(0, targetIndex - searchRange);
+                let end = Math.min(bufferLength - 1, targetIndex + searchRange);
+
+                for (let i = start; i <= end; i++) {
+                    if (lastSpecResults[i] > maxVal) {
+                        maxVal = lastSpecResults[i];
+                        maxIndex = i;
+                    }
+                }
+
+                const peakFreq = maxIndex * freqPerBin;
+
+                tooltip.style.display = 'block';
+                tooltip.style.left = (x + 10) + 'px';
+                tooltip.style.top = (y - 30) + 'px';
+                tooltip.innerHTML = `Freq: <strong>${peakFreq.toFixed(1)} Hz</strong>`;
+            };
+
+            container.addEventListener('mousemove', (e) => handleMove(e.clientX, e.clientY));
+            container.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                const touch = e.touches[0];
+                handleMove(touch.clientX, touch.clientY);
+            }, { passive: false });
+
+            container.addEventListener('mouseleave', () => {
+                tooltip.style.display = 'none';
+            });
+            container.addEventListener('touchend', () => {
+                setTimeout(() => tooltip.style.display = 'none', 2000);
+            });
+        }
+
+        function downloadCanvas(canvasId, filename) {
+            const canvas = document.getElementById(canvasId);
+            const link = document.createElement('a');
+            link.download = filename;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        }
+    </script>
+</body>
+
+</html>
