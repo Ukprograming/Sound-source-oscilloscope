@@ -1039,23 +1039,28 @@
                 const x = clientX - rect.left;
                 const y = clientY - rect.top;
 
-                const cssW = rect.width;
-                const cssH = rect.height;
+                // --- 修正箇所: 座標計算の論理を修正 ---
+                // canvasの描画は ctx.scale(dpr, dpr) されているため、
+                // MARGINの値はそのままCSSピクセル（見た目の座標）として扱えます。
 
-                const leftRatio = MARGIN.left / specCanvas.width;
-                const rightRatio = MARGIN.right / specCanvas.width;
-                const drawW_Ratio = 1 - leftRatio - rightRatio;
+                const graphStartX = MARGIN.left;
+                const graphEndX = rect.width - MARGIN.right;
+                const graphWidth = graphEndX - graphStartX;
 
-                const cssMarginLeft = cssW * leftRatio;
-                const cssGraphW = cssW * drawW_Ratio;
+                // グラフの描画範囲外なら処理しない、または範囲内に丸める
+                if (graphWidth <= 0) return;
 
-                let ratioX = (x - cssMarginLeft) / cssGraphW;
+                let ratioX = (x - graphStartX) / graphWidth;
+
+                // 範囲外のタップを0.0〜1.0に収める
                 if (ratioX < 0) ratioX = 0;
                 if (ratioX > 1) ratioX = 1;
 
+                // 現在のスライダー設定（最大周波数）を取得
                 const maxFreq = parseFloat(document.getElementById('spec-freq-range').value);
                 const targetFreq = ratioX * maxFreq;
 
+                // 周波数から配列のインデックスを逆算
                 const sampleRate = audioCtx.sampleRate;
                 const bufferLength = lastSpecResults.length;
                 const freqPerBin = (sampleRate / 2) / bufferLength;
@@ -1063,7 +1068,8 @@
                 let targetIndex = Math.round(targetFreq / freqPerBin);
                 if (targetIndex >= bufferLength) targetIndex = bufferLength - 1;
 
-                let searchRange = 20;
+                // タップした周辺の最大ピークを探す（指が多少ずれてもピークを拾うように）
+                let searchRange = 20; // 探索範囲
                 let maxVal = -1;
                 let maxIndex = targetIndex;
 
@@ -1079,14 +1085,27 @@
 
                 const peakFreq = maxIndex * freqPerBin;
 
+                // ツールチップの表示位置と内容更新
                 tooltip.style.display = 'block';
-                tooltip.style.left = (x + 10) + 'px';
+                // ツールチップが画面外にはみ出さないよう調整
+                let toolTipLeft = x + 10;
+                if (toolTipLeft + 100 > rect.width) {
+                    toolTipLeft = x - 110;
+                }
+
+                tooltip.style.left = toolTipLeft + 'px';
                 tooltip.style.top = (y - 30) + 'px';
-                tooltip.innerHTML = `Freq: <strong>${peakFreq.toFixed(1)} Hz</strong>`;
+                tooltip.innerHTML = `Cursor: ${targetFreq.toFixed(0)} Hz<br>Peak: <strong>${peakFreq.toFixed(1)} Hz</strong>`;
             };
 
             container.addEventListener('mousemove', (e) => handleMove(e.clientX, e.clientY));
             container.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                const touch = e.touches[0];
+                handleMove(touch.clientX, touch.clientY);
+            }, { passive: false });
+
+            container.addEventListener('touchmove', (e) => {
                 e.preventDefault();
                 const touch = e.touches[0];
                 handleMove(touch.clientX, touch.clientY);
