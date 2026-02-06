@@ -352,7 +352,8 @@
                         <div class="control-group">
                             <label>振動数 (Frequency): <span id="l-freq-val" class="value-display">440 Hz</span></label>
                             <input type="range" id="l-freq" min="100" max="2000" value="440" step="1"
-                                oninput="updateSource('l')">
+                                oninput="updateFrequency('l')">
+
                         </div>
 
                         <div class="control-group">
@@ -397,7 +398,8 @@
                         <div class="control-group">
                             <label>振動数 (Frequency): <span id="r-freq-val" class="value-display">440 Hz</span></label>
                             <input type="range" id="r-freq" min="100" max="2000" value="440" step="1"
-                                oninput="updateSource('r')">
+                                oninput="updateFrequency('r')">
+
                         </div>
 
                         <div class="control-group">
@@ -585,8 +587,8 @@
         let audioCtx;
         let isAudioInit = false;
         const sources = {
-            l: { osc: null, gain: null, panner: null, phase: 1 },
-            r: { osc: null, gain: null, panner: null, phase: 1 }
+            l: { osc: null, gain: null, panner: null, phase: 1, isOn: false },
+            r: { osc: null, gain: null, panner: null, phase: 1, isOn: false }
         };
         let micStream = null, analyser = null, micSource = null;
 
@@ -631,8 +633,16 @@
                 micStream = await navigator.mediaDevices.getUserMedia(constraints);
                 micSource = audioCtx.createMediaStreamSource(micStream);
                 analyser = audioCtx.createAnalyser();
-                analyser.fftSize = 2048;
+                analyser.fftSize = 4096;
+
+                // （任意）見た目の安定化：トリガ探索をやりやすくするため
+                analyser.minDecibels = -90;
+                analyser.maxDecibels = -10;
+
                 micSource.connect(analyser);
+
+                // ★ 追加：オシロ用バッファを使い回す（毎フレームnewしない）
+                window._oscFloatBuf = new Float32Array(analyser.fftSize);
 
                 drawOscilloscope();
 
@@ -677,54 +687,131 @@
             }
         }
 
+        function ensureChannel(ch) {
+            if (!isAudioInit) return;
+
+            const s = sources[ch];
+            if (s.osc) return; // 既に生成済み
+
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            const panner = audioCtx.createStereoPanner();
+
+            // 初期設定
+            osc.type = document.getElementById(ch + '-wave').value;
+            osc.frequency.setValueAtTime(parseFloat(document.getElementById(ch + '-freq').value), audioCtx.currentTime);
+
+            // ★最初は無音で開始（ONになったらフェードイン）
+            gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
+
+            panner.pan.setValueAtTime(ch === 'l' ? -1 : 1, audioCtx.currentTime);
+
+            osc.connect(gainNode);
+            gainNode.connect(panner);
+            panner.connect(audioCtx.destination);
+            osc.start();
+
+            s.osc = osc;
+            s.gain = gainNode;
+            s.panner = panner;
+        }
+
+        function smoothSetFrequency(osc, targetHz) {
+            const now = audioCtx.currentTime;
+            // 直前の予約を消して、今の値から滑らかに追従
+            osc.frequency.cancelScheduledValues(now);
+
+            // ★追従の速さ（小さいほどキビキビ / 大きいほど滑らか）
+            const timeConstant = 0.015; // 15ms くらい（好みで 0.005〜0.03）
+            osc.frequency.setTargetAtTime(targetHz, now, timeConstant);
+        }
+
+        function smoothSetGain(gainParam, target) {
+            const now = audioCtx.currentTime;
+            gainParam.cancelScheduledValues(now);
+
+            // ★短いフェードでクリックを防ぐ（5〜20ms程度）
+            const fade = 0.01;
+            gainParam.setTargetAtTime(target, now, fade);
+        }
+
+        // 位相反転（+1 / -1）をクリック無しに（0を経由して反転）
+        function smoothSetPhaseGain(gainParam, targetSignedGain) {
+            const now = audioCtx.currentTime;
+            gainParam.cancelScheduledValues(now);
+
+            // いったん0へ → 反転後の値へ（計10ms）
+            gainParam.linearRampToValueAtTime(0, now + 0.005);
+            gainParam.linearRampToValueAtTime(targetSignedGain, now + 0.010);
+        }
+
+        function updateFrequency(ch) {
+            if (!isAudioInit) return;
+
+            const freq = parseFloat(document.getElementById(ch + '-freq').value);
+            document.getElementById(ch + '-freq-val').innerText = freq + ' Hz';
+
+            ensureChannel(ch);
+
+            const s = sources[ch];
+            if (!s.osc) return;
+
+            // ★周波数だけ滑らかに追従（ゲインは一切触らない）
+            smoothSetFrequency(s.osc, freq);
+        }
+
+
         function updateSource(ch) {
             if (!isAudioInit) return;
-            const isOn = document.getElementById(ch + '-power').checked;
 
-            // UI Status Update
+            const isOn = document.getElementById(ch + '-power').checked;
+            const s = sources[ch];
+
+            // UI
             const statusText = document.getElementById(ch + '-status-text');
-            if (isOn) {
-                statusText.innerText = "ON";
-                statusText.classList.add('on');
-            } else {
-                statusText.innerText = "OFF";
-                statusText.classList.remove('on');
-            }
+            if (isOn) { statusText.innerText = "ON"; statusText.classList.add('on'); }
+            else { statusText.innerText = "OFF"; statusText.classList.remove('on'); }
 
             const freq = parseFloat(document.getElementById(ch + '-freq').value);
             const vol = parseFloat(document.getElementById(ch + '-vol').value);
             const wave = document.getElementById(ch + '-wave').value;
-            const phase = sources[ch].phase;
 
             document.getElementById(ch + '-freq-val').innerText = freq + ' Hz';
             document.getElementById(ch + '-vol-val').innerText = vol;
 
-            if (sources[ch].osc) {
-                sources[ch].osc.stop();
-                sources[ch].osc.disconnect();
-                sources[ch].osc = null;
+            ensureChannel(ch);
+
+            // 波形タイプ変更（ここではそのまま。気になるならフェード処理追加可）
+            if (s.osc && s.osc.type !== wave) s.osc.type = wave;
+
+            // 周波数は滑らかに（ただし updateFrequency が頻繁に呼ばれるので、ここも問題ない）
+            if (s.osc) smoothSetFrequency(s.osc, freq);
+
+            // ★ゲイン更新は「必要なときだけ」
+            const targetSignedGain = (isOn ? vol : 0) * s.phase;
+
+            const phaseChanged = (s._lastPhase === undefined || s._lastPhase !== s.phase);
+            const onChanged = (s._lastOn === undefined || s._lastOn !== isOn);
+            const volChanged = (s._lastVol === undefined || s._lastVol !== vol);
+
+            const firstRun = (s._lastOn === undefined);
+
+            if (s.gain) {
+                if (!firstRun && phaseChanged) {
+                    smoothSetPhaseGain(s.gain.gain, targetSignedGain); // 位相が変わったときだけ
+                } else if (onChanged || volChanged || firstRun) {
+                    smoothSetGain(s.gain.gain, targetSignedGain);      // 初回/ON/OFF/音量変更
+                } else {
+                    // 周波数だけ変わった場合は触らない（ここが重要）
+                }
             }
 
-            if (isOn) {
-                const osc = audioCtx.createOscillator();
-                const gainNode = audioCtx.createGain();
-                const panner = audioCtx.createStereoPanner();
-
-                osc.type = wave;
-                osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
-                gainNode.gain.setValueAtTime(vol * phase, audioCtx.currentTime);
-                panner.pan.setValueAtTime(ch === 'l' ? -1 : 1, audioCtx.currentTime);
-
-                osc.connect(gainNode);
-                gainNode.connect(panner);
-                panner.connect(audioCtx.destination);
-                osc.start();
-
-                sources[ch].osc = osc;
-                sources[ch].gain = gainNode;
-                sources[ch].panner = panner;
-            }
+            s._lastPhase = s.phase;
+            s._lastOn = isOn;
+            s._lastVol = vol;
         }
+
+
 
         function setPhase(ch, val) {
             sources[ch].phase = val;
@@ -748,84 +835,97 @@
             }
             if (isOscPaused && !forceRedraw) return;
 
-            if (analyser.fftSize !== 2048) analyser.fftSize = 2048;
+            // 設定
+            const drawMode = document.getElementById('osc-draw-mode').value;
+            const timeScale = parseFloat(document.getElementById('osc-time-scale').value); // 1〜10
+            const ampScale = parseFloat(document.getElementById('osc-amp-scale').value);
+
+            // FFTサイズが他(スペクトル)で変わっている可能性があるので戻す
+            const OSC_FFT_SIZE = 4096; // ★上で合わせる（重ければ2048）
+            if (analyser.fftSize !== OSC_FFT_SIZE) {
+                analyser.fftSize = OSC_FFT_SIZE;
+                window._oscFloatBuf = new Float32Array(analyser.fftSize);
+            }
 
             const bufferLength = analyser.fftSize;
-            const dataArray = new Uint8Array(bufferLength);
-            analyser.getByteTimeDomainData(dataArray);
+            const floatBuf = window._oscFloatBuf;
+            analyser.getFloatTimeDomainData(floatBuf); // ★-1〜+1 の高分解能データ
 
-            const width = oscCanvas.width / (window.devicePixelRatio || 1);
-            const height = oscCanvas.height / (window.devicePixelRatio || 1);
+            const dpr = window.devicePixelRatio || 1;
+            const width = oscCanvas.width / dpr;   // CSS px
+            const height = oscCanvas.height / dpr; // CSS px
 
+            // 背景
             oscCtx.fillStyle = 'rgb(20, 20, 20)';
             oscCtx.fillRect(0, 0, width, height);
 
+            // 中心線
             oscCtx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
             oscCtx.lineWidth = 1;
             oscCtx.beginPath();
-            oscCtx.moveTo(0, height / 2); oscCtx.lineTo(width, height / 2);
+            oscCtx.moveTo(0, height / 2);
+            oscCtx.lineTo(width, height / 2);
             oscCtx.stroke();
 
-            // Settings
-            const drawMode = document.getElementById('osc-draw-mode').value;
-            const timeScale = parseFloat(document.getElementById('osc-time-scale').value);
-            const ampScale = parseFloat(document.getElementById('osc-amp-scale').value);
+            // ★ timeScale は「表示するサンプル数」を変える（ズーム）
+            // timeScaleが大きいほど拡大＝表示点数を減らす
+            const samplesToShow = Math.max(64, Math.floor(bufferLength / timeScale));
 
-            oscCtx.lineWidth = 3;
-            oscCtx.strokeStyle = 'rgb(0, 255, 0)';
-            oscCtx.lineJoin = 'round';
-            oscCtx.lineCap = 'round';
-            oscCtx.beginPath();
-
-            const sliceWidth = width * 1.0 / bufferLength * timeScale;
-
-            // Trigger logic (stabilize waveform)
+            // トリガ（0V相当を上向きに横切る点）を探す：Floatなので 0 を基準
             let triggerOffset = 0;
-            // Simple rising edge trigger
-            for (let i = 0; i < bufferLength / 2; i++) {
-                if (dataArray[i] < 128 && dataArray[i + 1] >= 128) {
+            for (let i = 0; i < bufferLength - 1; i++) {
+                if (floatBuf[i] < 0 && floatBuf[i + 1] >= 0) {
                     triggerOffset = i;
                     break;
                 }
             }
 
-            let x = 0;
-            let startY = 0;
+            // 描画スタイル
+            oscCtx.lineWidth = 3;
+            oscCtx.strokeStyle = 'rgb(0, 255, 0)';
+            oscCtx.lineJoin = 'round';
+            oscCtx.lineCap = 'round';
 
-            let firstIndex = triggerOffset;
-            let v = dataArray[firstIndex] / 128.0;
-            let y = (v - 1) * height / 2 * ampScale + height / 2;
-            oscCtx.moveTo(x, y);
+            oscCtx.beginPath();
 
-            let prevX = x;
-            let prevY = y;
+            // ★ ここが肝：1pxごとに「対応するサンプル位置」を計算して線形補間
+            // これで階段状のガタつきがかなり減る
+            const centerY = height / 2;
+            const yScale = (height / 2) * ampScale;
 
-            for (let i = 1; i < bufferLength; i++) {
-                let index = i + triggerOffset;
-                if (index >= bufferLength) break;
+            // 描画範囲（サンプル）
+            const start = triggerOffset;
+            const end = Math.min(bufferLength - 1, start + samplesToShow - 1);
+            const span = Math.max(1, end - start);
 
-                v = dataArray[index] / 128.0;
-                y = (v - 1) * height / 2 * ampScale + height / 2;
-                x += sliceWidth;
-
-                if (drawMode === 'smooth') {
-                    // Smooth Curve (Quadratic)
-                    let midX = (prevX + x) / 2;
-                    let midY = (prevY + y) / 2;
-                    oscCtx.quadraticCurveTo(prevX, prevY, midX, midY);
-                } else {
-                    // Linear (Direct line for Square/Sawtooth accuracy)
-                    oscCtx.lineTo(x, y);
-                }
-
-                prevX = x;
-                prevY = y;
-
-                if (x > width) break;
-            }
+            const toY = (v) => centerY - (v * yScale);
 
             if (drawMode === 'smooth') {
-                oscCtx.lineTo(prevX, prevY);
+                // ★ smooth：x(ピクセル)→サンプル(小数)→線形補間
+                for (let x = 0; x < width; x++) {
+                    const t = x / (width - 1);             // 0..1
+                    const idx = start + t * span;          // 小数のサンプル位置
+                    const i0 = Math.floor(idx);
+                    const i1 = Math.min(i0 + 1, bufferLength - 1);
+                    const frac = idx - i0;
+
+                    const v = floatBuf[i0] * (1 - frac) + floatBuf[i1] * frac;
+                    const y = toY(v);
+
+                    if (x === 0) oscCtx.moveTo(x, y);
+                    else oscCtx.lineTo(x, y);
+                }
+            } else {
+                // linear：サンプル点をそのまま結ぶ（矩形/ノコギリの角が崩れにくい）
+                const step = span / (width - 1);
+                for (let x = 0; x < width; x++) {
+                    const idx = Math.round(start + x * step);
+                    const v = floatBuf[Math.min(idx, bufferLength - 1)];
+                    const y = toY(v);
+
+                    if (x === 0) oscCtx.moveTo(x, y);
+                    else oscCtx.lineTo(x, y);
+                }
             }
 
             oscCtx.stroke();
@@ -834,6 +934,7 @@
                 oscAnimationId = requestAnimationFrame(() => drawOscilloscope());
             }
         }
+
 
         function toggleOscPause() {
             isOscPaused = !isOscPaused;
