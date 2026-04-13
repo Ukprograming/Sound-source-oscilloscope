@@ -304,19 +304,50 @@
             font-weight: normal;
             color: var(--primary);
         }
+
+        .freq-stepper {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .step-btn {
+            min-width: 64px;
+            min-height: 48px;
+            padding: 0 16px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            background: #f7f7fa;
+            color: var(--text);
+            font-size: 24px;
+            font-weight: bold;
+            cursor: pointer;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .step-btn:active {
+            background: #e4e4ea;
+        }
+
+        .freq-slider-wrap {
+            flex: 1;
+            min-width: 0;
+        }
     </style>
 </head>
 
 <body>
 
     <div id="start-overlay">
-        <button id="start-btn">実験を開始する<br><span style="font-size:14px">タップして音声を有効化 (44.1kHz)</span></button>
+        <button id="start-btn">計測を開始する<br><span style="font-size:14px">タップしてマイクと音声を有効化します (44.1kHz)</span></button>
     </div>
 
     <header>
         <div class="mode-switch">
-            <button class="mode-btn active" onclick="switchMode('source')">音源 (Source)</button>
-            <button class="mode-btn" onclick="switchMode('observer')">観測者 (Observer)</button>
+            <button class="mode-btn active" onclick="switchMode('source')">音源モード</button>
+            <button class="mode-btn" onclick="switchMode('observer')">観測モード</button>
         </div>
     </header>
 
@@ -324,7 +355,7 @@
         <div id="source-mode">
             <div class="card">
                 <h3>音源設定</h3>
-                <p style="font-size: 0.9em; color: #666;">※ ステレオ効果（左右独立）を確認するには、外部スピーカーを接続することを推奨します。</p>
+                <p style="font-size: 0.9em; color: #666;">左右チャンネルごとに波形・周波数・音量・位相を調整できます。スライダーとボタンのどちらでも滑らかに変更できます。</p>
 
                 <div class="channel-container">
                     <div class="channel-box">
@@ -350,10 +381,23 @@
                         </div>
 
                         <div class="control-group">
-                            <label>振動数 (Frequency): <span id="l-freq-val" class="value-display">440 Hz</span></label>
-                            <input type="range" id="l-freq" min="100" max="2000" value="440" step="1"
-                                oninput="updateFrequency('l')">
-
+                            <label>周波数 (Frequency): <span id="l-freq-val" class="value-display">440 Hz</span></label>
+                            <div class="freq-stepper">
+                                <button class="step-btn" type="button" aria-label="Left frequency down 1 Hz"
+                                    onpointerdown="startFreqNudge(event, 'l', -1)"
+                                    onpointerup="stopFreqNudge()"
+                                    onpointercancel="stopFreqNudge()"
+                                    onpointerleave="stopFreqNudge()">-</button>
+                                <div class="freq-slider-wrap">
+                                    <input type="range" id="l-freq" min="100" max="2000" value="440" step="1"
+                                        oninput="updateFrequency('l')">
+                                </div>
+                                <button class="step-btn" type="button" aria-label="Left frequency up 1 Hz"
+                                    onpointerdown="startFreqNudge(event, 'l', 1)"
+                                    onpointerup="stopFreqNudge()"
+                                    onpointercancel="stopFreqNudge()"
+                                    onpointerleave="stopFreqNudge()">+</button>
+                            </div>
                         </div>
 
                         <div class="control-group">
@@ -366,9 +410,8 @@
                             <label>位相 (Phase)</label>
                             <div class="row">
                                 <button class="btn btn-outline" id="l-phase-norm" onclick="setPhase('l', 1)"
-                                    style="background:#ddd">正相 (+)</button>
-                                <button class="btn btn-outline" id="l-phase-inv" onclick="setPhase('l', -1)">逆相
-                                    (-)</button>
+                                    style="background:#ddd">通常 (+)</button>
+                                <button class="btn btn-outline" id="l-phase-inv" onclick="setPhase('l', -1)">反転 (-)</button>
                             </div>
                         </div>
                     </div>
@@ -396,10 +439,23 @@
                         </div>
 
                         <div class="control-group">
-                            <label>振動数 (Frequency): <span id="r-freq-val" class="value-display">440 Hz</span></label>
-                            <input type="range" id="r-freq" min="100" max="2000" value="440" step="1"
-                                oninput="updateFrequency('r')">
-
+                            <label>周波数 (Frequency): <span id="r-freq-val" class="value-display">440 Hz</span></label>
+                            <div class="freq-stepper">
+                                <button class="step-btn" type="button" aria-label="Right frequency down 1 Hz"
+                                    onpointerdown="startFreqNudge(event, 'r', -1)"
+                                    onpointerup="stopFreqNudge()"
+                                    onpointercancel="stopFreqNudge()"
+                                    onpointerleave="stopFreqNudge()">-</button>
+                                <div class="freq-slider-wrap">
+                                    <input type="range" id="r-freq" min="100" max="2000" value="440" step="1"
+                                        oninput="updateFrequency('r')">
+                                </div>
+                                <button class="step-btn" type="button" aria-label="Right frequency up 1 Hz"
+                                    onpointerdown="startFreqNudge(event, 'r', 1)"
+                                    onpointerup="stopFreqNudge()"
+                                    onpointercancel="stopFreqNudge()"
+                                    onpointerleave="stopFreqNudge()">+</button>
+                            </div>
                         </div>
 
                         <div class="control-group">
@@ -412,9 +468,8 @@
                             <label>位相 (Phase)</label>
                             <div class="row">
                                 <button class="btn btn-outline" id="r-phase-norm" onclick="setPhase('r', 1)"
-                                    style="background:#ddd">正相 (+)</button>
-                                <button class="btn btn-outline" id="r-phase-inv" onclick="setPhase('r', -1)">逆相
-                                    (-)</button>
+                                    style="background:#ddd">通常 (+)</button>
+                                <button class="btn btn-outline" id="r-phase-inv" onclick="setPhase('r', -1)">反転 (-)</button>
                             </div>
                         </div>
                     </div>
@@ -427,8 +482,7 @@
                 <div class="ch-header">
                     <h3>オシロスコープ (波形)</h3>
                     <div>
-                        <button class="btn btn-primary" id="osc-pause-btn" onclick="toggleOscPause()">キャプチャ
-                            (停止)</button>
+                        <button class="btn btn-primary" id="osc-pause-btn" onclick="toggleOscPause()">キャプチャ (停止)</button>
                         <button class="btn btn-outline"
                             onclick="downloadCanvas('osc-canvas', 'waveform.png')">保存</button>
                     </div>
@@ -441,8 +495,8 @@
                         <div style="flex:1">
                             <label>描画モード</label>
                             <select id="osc-draw-mode">
-                                <option value="linear">リニア波形 (矩形/ノコギリ波など)</option>
-                                <option value="smooth" selected>滑らか波形 (正弦波など)</option>
+                                <option value="linear">リニア波形 (矩形波/ノコギリ波向け)</option>
+                                <option value="smooth" selected>なめらか波形 (正弦波向け)</option>
                             </select>
                         </div>
                         <div style="flex:1">
@@ -459,7 +513,7 @@
 
             <div class="card">
                 <div class="ch-header">
-                    <h3>簡易スペクトル解析 (FFT)</h3>
+                    <h3>周波数スペクトル解析 (FFT)</h3>
                     <button class="btn btn-outline" onclick="downloadCanvas('spec-canvas', 'spectrum.png')">保存</button>
                 </div>
                 <div class="control-group">
@@ -474,7 +528,7 @@
                             </select>
                         </div>
                         <div>
-                            <label>録音時間(秒)</label>
+                            <label>録音時間 (秒)</label>
                             <input type="number" id="spec-duration" value="1.0" min="0.1" max="5.0" step="0.1"
                                 style="width: 80px;">
                         </div>
@@ -496,13 +550,13 @@
                 <div class="control-group" style="margin-top: 15px;">
                     <div class="row">
                         <div style="flex:1">
-                            <label>周波数範囲 (Max Hz)</label>
+                            <label>表示周波数範囲 (Max Hz)</label>
                             <input type="range" id="spec-freq-range" min="1000" max="22050" value="3000" step="500"
                                 oninput="updateSpecGridLabel(this.value)">
                             <span id="spec-freq-val" style="font-size:12px">3000 Hz</span>
                         </div>
                         <div style="flex:1">
-                            <label>強度範囲 (dB Scale)</label>
+                            <label>感度範囲 (dB Scale)</label>
                             <input type="range" id="spec-db-range" min="50" max="150" value="100" step="10">
                         </div>
                     </div>
@@ -512,7 +566,7 @@
     </main>
 
     <script>
-        // --- 簡易的なJS FFTの実装 (Hann窓対応のため) ---
+        // --- 邁｡譏鍋噪縺ｪJS FFT縺ｮ螳溯｣・(Hann遯灘ｯｾ蠢懊・縺溘ａ) ---
         class SimpleFFT {
             constructor(size) {
                 this.size = size;
@@ -583,7 +637,7 @@
             }
         }
 
-        // --- アプリケーション本体 ---
+        // --- 繧｢繝励Μ繧ｱ繝ｼ繧ｷ繝ｧ繝ｳ譛ｬ菴・---
         let audioCtx;
         let isAudioInit = false;
         const sources = {
@@ -603,6 +657,8 @@
         let recordedBuffers = [];
         let isSpecRecording = false;
         let lastSpecResults = null;
+        let freqNudgeTimeoutId = null;
+        let freqNudgeIntervalId = null;
 
         const MARGIN = { top: 20, right: 30, bottom: 40, left: 60 };
 
@@ -618,7 +674,7 @@
 
                 drawSpectrumGrid(specCtx, 3000, 100);
 
-                // --- 修正点：マイク入力の自動調整を無効化 ---
+                // --- 菫ｮ豁｣轤ｹ・壹・繧､繧ｯ蜈･蜉帙・閾ｪ蜍戊ｪｿ謨ｴ繧堤┌蜉ｹ蛹・---
                 const constraints = {
                     audio: {
                         echoCancellation: false,
@@ -635,13 +691,12 @@
                 analyser = audioCtx.createAnalyser();
                 analyser.fftSize = 4096;
 
-                // （任意）見た目の安定化：トリガ探索をやりやすくするため
+                // ・井ｻｻ諢擾ｼ芽ｦ九◆逶ｮ縺ｮ螳牙ｮ壼喧・壹ヨ繝ｪ繧ｬ謗｢邏｢繧偵ｄ繧翫ｄ縺吶￥縺吶ｋ縺溘ａ
                 analyser.minDecibels = -90;
                 analyser.maxDecibels = -10;
 
                 micSource.connect(analyser);
 
-                // ★ 追加：オシロ用バッファを使い回す（毎フレームnewしない）
                 window._oscFloatBuf = new Float32Array(analyser.fftSize);
 
                 drawOscilloscope();
@@ -653,8 +708,14 @@
 
             } catch (err) {
                 console.error(err);
-                alert("マイクの使用が拒否されたか、エラーが発生しました。\n" + err);
+                alert("マイクの使用が許可されなかったか、エラーが発生しました。\n" + err);
             }
+        });
+
+        window.addEventListener('pointerup', stopFreqNudge);
+        window.addEventListener('pointercancel', stopFreqNudge);
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) stopFreqNudge();
         });
 
         function setupCanvas(canvas) {
@@ -691,17 +752,15 @@
             if (!isAudioInit) return;
 
             const s = sources[ch];
-            if (s.osc) return; // 既に生成済み
+            if (s.osc) return; // 譌｢縺ｫ逕滓・貂医∩
 
             const osc = audioCtx.createOscillator();
             const gainNode = audioCtx.createGain();
             const panner = audioCtx.createStereoPanner();
 
-            // 初期設定
             osc.type = document.getElementById(ch + '-wave').value;
             osc.frequency.setValueAtTime(parseFloat(document.getElementById(ch + '-freq').value), audioCtx.currentTime);
 
-            // ★最初は無音で開始（ONになったらフェードイン）
             gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
 
             panner.pan.setValueAtTime(ch === 'l' ? -1 : 1, audioCtx.currentTime);
@@ -718,11 +777,9 @@
 
         function smoothSetFrequency(osc, targetHz) {
             const now = audioCtx.currentTime;
-            // 直前の予約を消して、今の値から滑らかに追従
             osc.frequency.cancelScheduledValues(now);
 
-            // ★追従の速さ（小さいほどキビキビ / 大きいほど滑らか）
-            const timeConstant = 0.015; // 15ms くらい（好みで 0.005〜0.03）
+            const timeConstant = 0.015;
             osc.frequency.setTargetAtTime(targetHz, now, timeConstant);
         }
 
@@ -730,17 +787,14 @@
             const now = audioCtx.currentTime;
             gainParam.cancelScheduledValues(now);
 
-            // ★短いフェードでクリックを防ぐ（5〜20ms程度）
             const fade = 0.01;
             gainParam.setTargetAtTime(target, now, fade);
         }
 
-        // 位相反転（+1 / -1）をクリック無しに（0を経由して反転）
         function smoothSetPhaseGain(gainParam, targetSignedGain) {
             const now = audioCtx.currentTime;
             gainParam.cancelScheduledValues(now);
 
-            // いったん0へ → 反転後の値へ（計10ms）
             gainParam.linearRampToValueAtTime(0, now + 0.005);
             gainParam.linearRampToValueAtTime(targetSignedGain, now + 0.010);
         }
@@ -756,10 +810,43 @@
             const s = sources[ch];
             if (!s.osc) return;
 
-            // ★周波数だけ滑らかに追従（ゲインは一切触らない）
             smoothSetFrequency(s.osc, freq);
         }
 
+
+        function applyFrequencyStep(ch, delta) {
+            const slider = document.getElementById(ch + '-freq');
+            const min = parseFloat(slider.min);
+            const max = parseFloat(slider.max);
+            const current = parseFloat(slider.value);
+            const next = Math.min(max, Math.max(min, current + delta));
+
+            if (next === current) return;
+
+            slider.value = String(next);
+            updateFrequency(ch);
+        }
+
+        function stopFreqNudge() {
+            if (freqNudgeTimeoutId) {
+                clearTimeout(freqNudgeTimeoutId);
+                freqNudgeTimeoutId = null;
+            }
+            if (freqNudgeIntervalId) {
+                clearInterval(freqNudgeIntervalId);
+                freqNudgeIntervalId = null;
+            }
+        }
+
+        function startFreqNudge(event, ch, delta) {
+            event.preventDefault();
+            stopFreqNudge();
+            applyFrequencyStep(ch, delta);
+
+            freqNudgeTimeoutId = setTimeout(() => {
+                freqNudgeIntervalId = setInterval(() => applyFrequencyStep(ch, delta), 90);
+            }, 350);
+        }
 
         function updateSource(ch) {
             if (!isAudioInit) return;
@@ -781,13 +868,10 @@
 
             ensureChannel(ch);
 
-            // 波形タイプ変更（ここではそのまま。気になるならフェード処理追加可）
             if (s.osc && s.osc.type !== wave) s.osc.type = wave;
 
-            // 周波数は滑らかに（ただし updateFrequency が頻繁に呼ばれるので、ここも問題ない）
-            if (s.osc) smoothSetFrequency(s.osc, freq);
+            smoothSetFrequency(s.osc, freq);
 
-            // ★ゲイン更新は「必要なときだけ」
             const targetSignedGain = (isOn ? vol : 0) * s.phase;
 
             const phaseChanged = (s._lastPhase === undefined || s._lastPhase !== s.phase);
@@ -798,11 +882,11 @@
 
             if (s.gain) {
                 if (!firstRun && phaseChanged) {
-                    smoothSetPhaseGain(s.gain.gain, targetSignedGain); // 位相が変わったときだけ
+                    smoothSetPhaseGain(s.gain.gain, targetSignedGain);
                 } else if (onChanged || volChanged || firstRun) {
-                    smoothSetGain(s.gain.gain, targetSignedGain);      // 初回/ON/OFF/音量変更
+                    smoothSetGain(s.gain.gain, targetSignedGain);      // 蛻晏屓/ON/OFF/髻ｳ驥丞､画峩
                 } else {
-                    // 周波数だけ変わった場合は触らない（ここが重要）
+                    // 蜻ｨ豕｢謨ｰ縺縺大､峨ｏ縺｣縺溷ｴ蜷医・隗ｦ繧峨↑縺・ｼ医％縺薙′驥崎ｦ・ｼ・
                 }
             }
 
@@ -835,13 +919,11 @@
             }
             if (isOscPaused && !forceRedraw) return;
 
-            // 設定
             const drawMode = document.getElementById('osc-draw-mode').value;
-            const timeScale = parseFloat(document.getElementById('osc-time-scale').value); // 1〜10
+            const timeScale = parseFloat(document.getElementById('osc-time-scale').value); // 1縲・0
             const ampScale = parseFloat(document.getElementById('osc-amp-scale').value);
 
-            // FFTサイズが他(スペクトル)で変わっている可能性があるので戻す
-            const OSC_FFT_SIZE = 4096; // ★上で合わせる（重ければ2048）
+            const OSC_FFT_SIZE = 4096;
             if (analyser.fftSize !== OSC_FFT_SIZE) {
                 analyser.fftSize = OSC_FFT_SIZE;
                 window._oscFloatBuf = new Float32Array(analyser.fftSize);
@@ -849,17 +931,16 @@
 
             const bufferLength = analyser.fftSize;
             const floatBuf = window._oscFloatBuf;
-            analyser.getFloatTimeDomainData(floatBuf); // ★-1〜+1 の高分解能データ
+            analyser.getFloatTimeDomainData(floatBuf); // 笘・1縲・1 縺ｮ鬮伜・隗｣閭ｽ繝・・繧ｿ
 
             const dpr = window.devicePixelRatio || 1;
             const width = oscCanvas.width / dpr;   // CSS px
             const height = oscCanvas.height / dpr; // CSS px
 
-            // 背景
+            // 閭梧勹
             oscCtx.fillStyle = 'rgb(20, 20, 20)';
             oscCtx.fillRect(0, 0, width, height);
 
-            // 中心線
             oscCtx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
             oscCtx.lineWidth = 1;
             oscCtx.beginPath();
@@ -867,11 +948,8 @@
             oscCtx.lineTo(width, height / 2);
             oscCtx.stroke();
 
-            // ★ timeScale は「表示するサンプル数」を変える（ズーム）
-            // timeScaleが大きいほど拡大＝表示点数を減らす
             const samplesToShow = Math.max(64, Math.floor(bufferLength / timeScale));
 
-            // トリガ（0V相当を上向きに横切る点）を探す：Floatなので 0 を基準
             let triggerOffset = 0;
             for (let i = 0; i < bufferLength - 1; i++) {
                 if (floatBuf[i] < 0 && floatBuf[i + 1] >= 0) {
@@ -880,7 +958,7 @@
                 }
             }
 
-            // 描画スタイル
+            // 謠冗判繧ｹ繧ｿ繧､繝ｫ
             oscCtx.lineWidth = 3;
             oscCtx.strokeStyle = 'rgb(0, 255, 0)';
             oscCtx.lineJoin = 'round';
@@ -888,12 +966,11 @@
 
             oscCtx.beginPath();
 
-            // ★ ここが肝：1pxごとに「対応するサンプル位置」を計算して線形補間
-            // これで階段状のガタつきがかなり減る
+            // 笘・縺薙％縺瑚・・・px縺斐→縺ｫ縲悟ｯｾ蠢懊☆繧九し繝ｳ繝励Ν菴咲ｽｮ縲阪ｒ險育ｮ励＠縺ｦ邱壼ｽ｢陬憺俣
+            // 縺薙ｌ縺ｧ髫取ｮｵ迥ｶ縺ｮ繧ｬ繧ｿ縺､縺阪′縺九↑繧頑ｸ帙ｋ
             const centerY = height / 2;
             const yScale = (height / 2) * ampScale;
 
-            // 描画範囲（サンプル）
             const start = triggerOffset;
             const end = Math.min(bufferLength - 1, start + samplesToShow - 1);
             const span = Math.max(1, end - start);
@@ -901,10 +978,10 @@
             const toY = (v) => centerY - (v * yScale);
 
             if (drawMode === 'smooth') {
-                // ★ smooth：x(ピクセル)→サンプル(小数)→線形補間
+                // 笘・smooth・噎(繝斐け繧ｻ繝ｫ)竊偵し繝ｳ繝励Ν(蟆乗焚)竊堤ｷ壼ｽ｢陬憺俣
                 for (let x = 0; x < width; x++) {
                     const t = x / (width - 1);             // 0..1
-                    const idx = start + t * span;          // 小数のサンプル位置
+                    const idx = start + t * span;          // 蟆乗焚縺ｮ繧ｵ繝ｳ繝励Ν菴咲ｽｮ
                     const i0 = Math.floor(idx);
                     const i1 = Math.min(i0 + 1, bufferLength - 1);
                     const frac = idx - i0;
@@ -916,7 +993,6 @@
                     else oscCtx.lineTo(x, y);
                 }
             } else {
-                // linear：サンプル点をそのまま結ぶ（矩形/ノコギリの角が崩れにくい）
                 const step = span / (width - 1);
                 for (let x = 0; x < width; x++) {
                     const idx = Math.round(start + x * step);
@@ -940,7 +1016,7 @@
             isOscPaused = !isOscPaused;
             const btn = document.getElementById('osc-pause-btn');
             if (isOscPaused) {
-                btn.innerText = "再開 (Live)";
+                btn.innerText = "ライブ表示";
                 btn.classList.replace('btn-primary', 'btn-success');
                 cancelAnimationFrame(oscAnimationId);
             } else {
@@ -959,7 +1035,7 @@
             const status = document.getElementById('spec-status');
             isSpecRecording = true;
             btn.disabled = true;
-            btn.innerText = "録音中...";
+            btn.innerText = "解析中...";
             status.innerText = "データ収集中...";
 
             analyser.fftSize = fftSize;
@@ -981,7 +1057,7 @@
         }
 
         function processSpectrum(fftSize) {
-            document.getElementById('spec-status').innerText = "解析中(FFT)...";
+            document.getElementById('spec-status').innerText = "解析中 (FFT)...";
 
             setTimeout(() => {
                 const fft = new SimpleFFT(fftSize);
@@ -1140,37 +1216,31 @@
                 const x = clientX - rect.left;
                 const y = clientY - rect.top;
 
-                // --- 修正箇所: 座標計算の論理を修正 ---
-                // canvasの描画は ctx.scale(dpr, dpr) されているため、
-                // MARGINの値はそのままCSSピクセル（見た目の座標）として扱えます。
-
+                // --- 菫ｮ豁｣邂・園: 蠎ｧ讓呵ｨ育ｮ励・隲也炊繧剃ｿｮ豁｣ ---
+                // canvas縺ｮ謠冗判縺ｯ ctx.scale(dpr, dpr) 縺輔ｌ縺ｦ縺・ｋ縺溘ａ縲・                // MARGIN縺ｮ蛟､縺ｯ縺昴・縺ｾ縺ｾCSS繝斐け繧ｻ繝ｫ・郁ｦ九◆逶ｮ縺ｮ蠎ｧ讓呻ｼ峨→縺励※謇ｱ縺医∪縺吶・
                 const graphStartX = MARGIN.left;
                 const graphEndX = rect.width - MARGIN.right;
                 const graphWidth = graphEndX - graphStartX;
 
-                // グラフの描画範囲外なら処理しない、または範囲内に丸める
+                // 繧ｰ繝ｩ繝輔・謠冗判遽・峇螟悶↑繧牙・逅・＠縺ｪ縺・√∪縺溘・遽・峇蜀・↓荳ｸ繧√ｋ
                 if (graphWidth <= 0) return;
 
                 let ratioX = (x - graphStartX) / graphWidth;
 
-                // 範囲外のタップを0.0〜1.0に収める
-                if (ratioX < 0) ratioX = 0;
+                // 遽・峇螟悶・繧ｿ繝・・繧・.0縲・.0縺ｫ蜿弱ａ繧・                if (ratioX < 0) ratioX = 0;
                 if (ratioX > 1) ratioX = 1;
 
-                // 現在のスライダー設定（最大周波数）を取得
-                const maxFreq = parseFloat(document.getElementById('spec-freq-range').value);
+                // 迴ｾ蝨ｨ縺ｮ繧ｹ繝ｩ繧､繝繝ｼ險ｭ螳夲ｼ域怙螟ｧ蜻ｨ豕｢謨ｰ・峨ｒ蜿門ｾ・                const maxFreq = parseFloat(document.getElementById('spec-freq-range').value);
                 const targetFreq = ratioX * maxFreq;
 
-                // 周波数から配列のインデックスを逆算
-                const sampleRate = audioCtx.sampleRate;
+                // 蜻ｨ豕｢謨ｰ縺九ｉ驟榊・縺ｮ繧､繝ｳ繝・ャ繧ｯ繧ｹ繧帝・ｮ・                const sampleRate = audioCtx.sampleRate;
                 const bufferLength = lastSpecResults.length;
                 const freqPerBin = (sampleRate / 2) / bufferLength;
 
                 let targetIndex = Math.round(targetFreq / freqPerBin);
                 if (targetIndex >= bufferLength) targetIndex = bufferLength - 1;
 
-                // タップした周辺の最大ピークを探す（指が多少ずれてもピークを拾うように）
-                let searchRange = 20; // 探索範囲
+                // 繧ｿ繝・・縺励◆蜻ｨ霎ｺ縺ｮ譛螟ｧ繝斐・繧ｯ繧呈爾縺呻ｼ域欠縺悟､壼ｰ代★繧後※繧ゅヴ繝ｼ繧ｯ繧呈鏡縺・ｈ縺・↓・・                let searchRange = 20; // 謗｢邏｢遽・峇
                 let maxVal = -1;
                 let maxIndex = targetIndex;
 
@@ -1186,9 +1256,9 @@
 
                 const peakFreq = maxIndex * freqPerBin;
 
-                // ツールチップの表示位置と内容更新
+                // 繝・・繝ｫ繝√ャ繝励・陦ｨ遉ｺ菴咲ｽｮ縺ｨ蜀・ｮｹ譖ｴ譁ｰ
                 tooltip.style.display = 'block';
-                // ツールチップが画面外にはみ出さないよう調整
+                // 繝・・繝ｫ繝√ャ繝励′逕ｻ髱｢螟悶↓縺ｯ縺ｿ蜃ｺ縺輔↑縺・ｈ縺・ｪｿ謨ｴ
                 let toolTipLeft = x + 10;
                 if (toolTipLeft + 100 > rect.width) {
                     toolTipLeft = x - 110;
