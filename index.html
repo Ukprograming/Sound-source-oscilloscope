@@ -341,7 +341,7 @@
 <body>
 
     <div id="start-overlay">
-        <button id="start-btn">計測を開始する<br><span style="font-size:14px">タップしてマイクと音声を有効化します (44.1kHz)</span></button>
+        <button id="start-btn">アプリを開始する<br><span style="font-size:14px">マイクは観測モードでのみ使用します</span></button>
     </div>
 
     <header>
@@ -640,11 +640,14 @@
         // --- 繧｢繝励Μ繧ｱ繝ｼ繧ｷ繝ｧ繝ｳ譛ｬ菴・---
         let audioCtx;
         let isAudioInit = false;
+        let currentMode = 'source';
         const sources = {
             l: { osc: null, gain: null, panner: null, phase: 1, isOn: false },
             r: { osc: null, gain: null, panner: null, phase: 1, isOn: false }
         };
         let micStream = null, analyser = null, micSource = null;
+        let micRequestId = 0;
+        let isMicStarting = false;
 
         let oscAnimationId;
         let isOscPaused = false;
@@ -656,6 +659,7 @@
 
         let recordedBuffers = [];
         let isSpecRecording = false;
+        let spectrumTimerId = null;
         let lastSpecResults = null;
         let freqNudgeTimeoutId = null;
         let freqNudgeIntervalId = null;
@@ -663,9 +667,12 @@
         const MARGIN = { top: 20, right: 30, bottom: 40, left: 60 };
 
         document.getElementById('start-btn').addEventListener('click', async () => {
+            const startButton = document.getElementById('start-btn');
+            startButton.disabled = true;
             try {
                 const AudioContext = window.AudioContext || window.webkitAudioContext;
-                audioCtx = new AudioContext({ sampleRate: 44100 });
+                if (!audioCtx) audioCtx = new AudioContext({ sampleRate: 44100 });
+                await audioCtx.resume();
 
                 document.getElementById('current-sr').innerText = `Rate: ${audioCtx.sampleRate}Hz (Hann Window)`;
 
@@ -674,8 +681,63 @@
 
                 drawSpectrumGrid(specCtx, 3000, 100);
 
-                // --- 菫ｮ豁｣轤ｹ・壹・繧､繧ｯ蜈･蜉帙・閾ｪ蜍戊ｪｿ謨ｴ繧堤┌蜉ｹ蛹・---
-                const constraints = {
+                analyser = audioCtx.createAnalyser();
+                analyser.fftSize = 4096;
+
+                // ・井ｻｻ諢擾ｼ芽ｦ九◆逶ｮ縺ｮ螳牙ｮ壼喧・壹ヨ繝ｪ繧ｬ謗｢邏｢繧偵ｄ繧翫ｄ縺吶￥縺吶ｋ縺溘ａ
+                analyser.minDecibels = -90;
+                analyser.maxDecibels = -10;
+
+                window._oscFloatBuf = new Float32Array(analyser.fftSize);
+
+                document.getElementById('start-overlay').style.display = 'none';
+                isAudioInit = true;
+
+                setupSpecInteraction();
+                await switchMode(currentMode);
+
+            } catch (err) {
+                console.error(err);
+                alert("音声の初期化中にエラーが発生しました。\n" + err);
+            } finally {
+                startButton.disabled = false;
+            }
+        });
+
+        function updateMicrophoneControls() {
+            document.getElementById('osc-pause-btn').disabled = !micStream;
+            document.getElementById('spec-start-btn').disabled = !micStream || isSpecRecording;
+        }
+
+        function stopMicrophone() {
+            // Invalidate any permission request that is still waiting for the user.
+            micRequestId++;
+            isMicStarting = false;
+            cancelAnimationFrame(oscAnimationId);
+            clearTimeout(spectrumTimerId);
+            spectrumTimerId = null;
+            if (isSpecRecording) {
+                isSpecRecording = false;
+                recordedBuffers = [];
+                document.getElementById('spec-start-btn').innerText = '解析開始';
+                document.getElementById('spec-status').innerText = '解析を中止しました';
+            }
+            if (micStream) micStream.getTracks().forEach(track => track.stop());
+            if (micSource) micSource.disconnect();
+            micStream = null;
+            micSource = null;
+            updateMicrophoneControls();
+        }
+
+        async function startMicrophone() {
+            if (!isAudioInit || currentMode !== 'observer' || micStream || isMicStarting) return;
+            const requestId = ++micRequestId;
+            isMicStarting = true;
+            let stream = null;
+            document.getElementById('spec-status').innerText = 'マイクを準備中...';
+            updateMicrophoneControls();
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({
                     audio: {
                         echoCancellation: false,
                         noiseSuppression: false,
@@ -684,33 +746,32 @@
                         googAutoGainControl: false
                     },
                     video: false
-                };
-
-                micStream = await navigator.mediaDevices.getUserMedia(constraints);
-                micSource = audioCtx.createMediaStreamSource(micStream);
-                analyser = audioCtx.createAnalyser();
-                analyser.fftSize = 4096;
-
-                // ・井ｻｻ諢擾ｼ芽ｦ九◆逶ｮ縺ｮ螳牙ｮ壼喧・壹ヨ繝ｪ繧ｬ謗｢邏｢繧偵ｄ繧翫ｄ縺吶￥縺吶ｋ縺溘ａ
-                analyser.minDecibels = -90;
-                analyser.maxDecibels = -10;
-
+                });
+                // A late permission response must not reactivate the mic in source mode.
+                if (requestId !== micRequestId || currentMode !== 'observer') {
+                    stream.getTracks().forEach(track => track.stop());
+                    return;
+                }
+                micSource = audioCtx.createMediaStreamSource(stream);
                 micSource.connect(analyser);
-
-                window._oscFloatBuf = new Float32Array(analyser.fftSize);
-
-                drawOscilloscope();
-
-                document.getElementById('start-overlay').style.display = 'none';
-                isAudioInit = true;
-
-                setupSpecInteraction();
-
+                micStream = stream;
+                document.getElementById('spec-status').innerText = '待機中';
             } catch (err) {
+                if (stream) stream.getTracks().forEach(track => track.stop());
+                if (requestId !== micRequestId || currentMode !== 'observer') return;
+                if (micSource) micSource.disconnect();
+                micSource = null;
+                micStream = null;
                 console.error(err);
+                document.getElementById('spec-status').innerText = 'マイクを使用できません。観測モードを押すと再試行します';
                 alert("マイクの使用が許可されなかったか、エラーが発生しました。\n" + err);
+            } finally {
+                if (requestId === micRequestId) {
+                    isMicStarting = false;
+                    updateMicrophoneControls();
+                }
             }
-        });
+        }
 
         window.addEventListener('pointerup', stopFreqNudge);
         window.addEventListener('pointercancel', stopFreqNudge);
@@ -728,13 +789,15 @@
             ctx.scale(dpr, dpr);
         }
 
-        function switchMode(mode) {
+        async function switchMode(mode) {
+            currentMode = mode;
             const btns = document.querySelectorAll('.mode-btn');
             btns.forEach(b => b.classList.remove('active'));
             if (mode === 'source') {
                 btns[0].classList.add('active');
                 document.getElementById('source-mode').classList.remove('hidden');
                 document.getElementById('observer-mode').classList.add('hidden');
+                stopMicrophone();
                 if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
             } else {
                 btns[1].classList.add('active');
@@ -742,9 +805,14 @@
                 document.getElementById('observer-mode').classList.remove('hidden');
                 setupCanvas(oscCanvas);
                 setupCanvas(specCanvas);
-                if (isOscPaused) drawOscilloscope(true);
-                else if (lastSpecResults) drawSpectrumGraph(lastSpecResults);
+                if (lastSpecResults) drawSpectrumGraph(lastSpecResults);
                 else drawSpectrumGrid(specCtx, parseFloat(document.getElementById('spec-freq-range').value), 100);
+                if (!isAudioInit) return;
+                if (audioCtx.state === 'suspended') await audioCtx.resume();
+                await startMicrophone();
+                if (currentMode !== 'observer' || !micStream) return;
+                cancelAnimationFrame(oscAnimationId);
+                drawOscilloscope(true);
             }
         }
 
@@ -913,6 +981,7 @@
 
         // --- Oscilloscope Drawing ---
         function drawOscilloscope(forceRedraw = false) {
+            if (!analyser || !micStream || currentMode !== 'observer') return;
             if (document.getElementById('observer-mode').classList.contains('hidden') && !forceRedraw) {
                 oscAnimationId = requestAnimationFrame(() => drawOscilloscope());
                 return;
@@ -1013,6 +1082,7 @@
 
 
         function toggleOscPause() {
+            if (!micStream || currentMode !== 'observer') return;
             isOscPaused = !isOscPaused;
             const btn = document.getElementById('osc-pause-btn');
             if (isOscPaused) {
@@ -1027,7 +1097,7 @@
         }
 
         function startSpectrumAnalysis() {
-            if (isSpecRecording) return;
+            if (!micStream || currentMode !== 'observer' || isSpecRecording) return;
             const duration = parseFloat(document.getElementById('spec-duration').value) * 1000;
             const fftSize = parseInt(document.getElementById('spec-fft-size').value);
 
@@ -1051,7 +1121,7 @@
                 const dataArray = new Float32Array(fftSize);
                 analyser.getFloatTimeDomainData(dataArray);
                 recordedBuffers.push(dataArray);
-                setTimeout(recordLoop, (fftSize / audioCtx.sampleRate) * 1000 * 0.5);
+                spectrumTimerId = setTimeout(recordLoop, (fftSize / audioCtx.sampleRate) * 1000 * 0.5);
             }
             recordLoop();
         }
@@ -1059,7 +1129,7 @@
         function processSpectrum(fftSize) {
             document.getElementById('spec-status').innerText = "解析中 (FFT)...";
 
-            setTimeout(() => {
+            spectrumTimerId = setTimeout(() => {
                 const fft = new SimpleFFT(fftSize);
                 const bufferCount = recordedBuffers.length;
                 if (bufferCount === 0) return;
